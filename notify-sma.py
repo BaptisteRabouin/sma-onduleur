@@ -1,83 +1,72 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+# Script qui envoi un email lorsqu'il y a une erreur sur l'onduleur
+
 import smtplib
-import time
+import emails_config
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.utils import formatdate
 import requests
 import urllib3
 
-# Permet de passer les problèmes liés au certificat https non valide
-urllib3.disable_warnings()
+# Envoyer des emails lorsque l'onduleur est en erreur
 
-# Récupère le code JSON de la page web de l'onduleur.
-# Code dynamique qui affiche toutes les 5 secondes l'état de l'appareil.
-url = "<IP-inverter>/dyn/getDashValues.json"
-r = requests.get(url, verify=False)  # Le "verify=false" vient compléter la ligne 12
-# en passant l'étape de danger lié à https
+def recuperer_donnees(url):
+    # Fonction qui recupere les donnees de la page web, ici les données Json
+    datas = requests.get(url, verify=False)
+    return datas
 
-# Ouverture (ou création) d'un fichier en écriture
-fichier = open("controleSMA.txt", "w")
-# écris le code récupéré dans ce fichier
-fichier.write(r.text)
-# ferme le fichier
-fichier.close()
 
-# Rouvre le fichier en lecture cettte fois.
-with open("controleSMA.txt", "r") as f:
-    b = f.readline()  # Lis le fichier ligne par ligne
-    c = b[273:276]  # récupère l'info précise localisée entre les index 273 et 274
-    print(c)
-    d = str(c)  # la converti en chaine de caractere pour l'analyser
-    if c != '307':  # si l'info récupérée n'est pas égale à 307 alors l'onduleur est en erreur
+def enregistrer_et_extraction_donnees(datas):
+    # Fonction qui ecrit les donnees dans un fichier et extrait la donnee qui nous interesse
+    with open("controleSMA.txt", "w") as fichier: # Ouvre le fichier en écriture ou le créer s'il n'existe pas (le "r+" ne fonctionne pas pour créer le fichier, seule le "w" marche)
+        fichier.write(datas.text) # Ecris les données dans le fichier
+    with open("controleSMA.txt", "r") as fichier: # Ouvre le fichier en lecture
+        ligne = fichier.read() # Lis le fichier
+        donnee_a_extraire = ligne[273:276]  # récupère l'info précise localisée entre les index 273 et 274
+    
+    return str(donnee_a_extraire) # Retourne la donnée voulue
 
-        server = smtplib.SMTP()
-        # server.set_debuglevel(1) # Décommenter pour activer le debug
-        server.connect('<your smtp address mail', 25)
 
-        server.helo()
+def envoyer_email(email_destinataire, sujet, message):
+    # Fonction qui envoi un email
+    multipart_message = MIMEMultipart()
+    multipart_message["Subject"] = sujet
+    multipart_message["From"] = emails_config.config_email
+    multipart_message["To"] = email_destinataire
 
-        fromaddr = 'Onduleur <address mail>'
-        toaddrs = ['<your address mail>']  # On peut mettre autant d'adresses que l'on souhaite
-        sujet = "L'onduleur est en erreur."
-        html = u"""\
-            <html>
-            <head>
-            <meta charset="utf-8" />
-            </head>
-            <body>
-            <div>
-            Bonjour Baptiste
+    multipart_message.attach(MIMEText(message, "plain"))
 
-            L'onduleur présente une erreur, veuillez vérifier que tout aille bien et si possible,
-            réenclenchez les panneaux solaires.
+    serveur_mail = smtplib.SMTP(emails_config.config_server, emails_config.config_server_port)
+    serveur_mail.starttls()
+    serveur_mail.login(emails_config.config_email, emails_config.config_password)
+    serveur_mail.sendmail(emails_config.config_email, email_destinataire, multipart_message.as_string())
+    serveur_mail.quit()
 
-            Merci et bonne journée.
 
-            Cordialement,
 
-            Votre SMA
-            </div>
-            </body
-            </html>
-            """
+message_email = """Bonjour,
 
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = sujet
-        msg['From'] = fromaddr
-        msg['To'] = ','.join(toaddrs)
-        msg["Date"] = formatdate(localtime=True)
+L'onduleur est en erreur !
 
-        part = MIMEText(html, 'html')
-        msg.attach(part)
+Merci de consulter les évènements relatifs à l'incident 
+directement depuis la page d'accès de l'onduleur.
 
-        try:
-            server.sendmail(fromaddr, toaddrs, msg.as_string())
-        except smtplib.SMTPException as e:
-            print(e)
+Cordialement,
 
-        server.quit()
-        #time.sleep(7200)  # Met en pause le programme pendant 2h le temps que l'onduleur soit remis en état ok.
-    else:
-        pass
+Onduleur SMA
+"""
+
+
+urllib3.disable_warnings()  # désactive les alertes liées au https
+
+
+url = "<IP_INVERTER>/dyn/getDashValues.json"
+
+datas_recuperees = recuperer_donnees(url)
+data_extraite = enregistrer_et_extraction_donnees(datas_recuperees)
+
+if data_extraite != "307":
+    envoyer_email("<YOUR_EMAIL>", "Erreur sur onduleur", message_email)
+else:
+    pass
+    #envoyer_email("<YOUR_EMAIL>", "TEST pour onduleur", "TEST")
+
