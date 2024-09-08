@@ -1,5 +1,5 @@
 # sma-onduleur
-A project I carried out in response to a specific need in my home
+A project I carried out in response to a specific need in my home to automate the sending of an email following an inverter error.
 
 ## The problem
 On a SMA brand photovoltaic inverter, when the inverter was in error, particularly due to an overvoltage or undervoltage of the electrical network, it would cut itself off without informing me. It was not equipped with the functionality allowing it to automatically reconnect if necessary.
