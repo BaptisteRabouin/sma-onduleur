@@ -1,4 +1,4 @@
-# sma-onduleur
+# sma-inverter
 A project I carried out in response to a specific need in my home to automate the sending of an email following an inverter error.
 
 ## The problem
